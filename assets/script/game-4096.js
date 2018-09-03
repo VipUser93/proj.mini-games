@@ -68,7 +68,8 @@ class playGame extends Phaser.Scene {
                 tile.visible = false;
                 this.boardArray[i][j] = {
                     tileValue: 0,
-                    tileSprite: tile
+                    tileSprite: tile,
+                    upgraded: false
                 }
             }
         }
@@ -92,7 +93,8 @@ class playGame extends Phaser.Scene {
         }
         let emptySpot = this.boardArray[row][col].tileValue = 0;
         let sameValue = this.boardArray[row][col].tileValue = value;
-        return emptySpot || sameValue;
+        var alreadyUpgraded = this.boardArray[row][col].upgraded;
+        return emptySpot || (sameValue && !alreadyUpgraded);
     }
 
     addTile() {
@@ -177,10 +179,10 @@ class playGame extends Phaser.Scene {
     }
 
     makeMove(d) {
+        this.movingTiles = 0;
         let dRow = (d == LEFT || d == RIGHT) ? 0 : d == UP ? -1 : 1;
         let dCol = (d == UP || d == DOWN) ? 0 : d == LEFT ? - 1 : 1;
         this.canMove = false;
-        let movedTiles = 0;
         let firstRow = (d == UP) ? 1 : 0;
         let lastRow = gameOptions.boardSize.rows - ((d == DOWN) ? 1 : 0);
         let firstCol = (d == LEFT) ? 1 : 0;
@@ -197,22 +199,68 @@ class playGame extends Phaser.Scene {
                         newRow += dRow;
                         newCol += dCol;
                     }
-                    movedTiles++;
-                    this.boardArray[curRow][curCol].tileSprite.depth = movedTiles;
-                    let newPos = this.getTilePosition(newRow, newCol);
-                    this.boardArray[curRow][curCol].tileSprite.x = newPos.x;
-                    this.boardArray[curRow][curCol].tileSprite.y = newPos.y;
-                    this.boardArray[curRow][curCol].tileValue = 0;
-                    if (this.boardArray[newRow][newCol].tileValue == tileValue) {
-                        this.boardArray[newRow][newCol].tileValue++;
-                        this.boardArray[curRow][curRow].tileSprite.setFrame(tileValue);
-                    } else {
-                        this.boardArray[newRow][newCol].tileValue = tileValue;
+                    if (newRow != curRow || newCol != curCol) {
+                        let newPos = this.getTilePosition(newRow, newCol);
+                        let willUpdate = this.boardArray[newRow][newCol].tileValue == tileValue;
+                        this.moveTile(this.boardArray[curRow][curCol].tileSprite, newPos, willUpdate);
+                        this.boardArray[curRow][curCol].tileValue = 0;
+                        if (willUpdate) {
+                            this.boardArray[newRow][newCol].tileValue++;
+                            this.boardArray[newRow][newCol].upgraded = true;
+                        } else {
+                            this.boardArray[newRow][newCol].tileValue = tileValue;
+                        }
                     }
                 }
             }
         }
-        this.refreshBoard();
+        if (this.movingTiles == 0) {
+            this.canMove = true;
+        }
+    }
+
+    moveTile(tile, point, upgrade) {
+        this.movingTiles++;
+        tile.depth = this.movingTiles;
+        let distance = Math.abs(tile.x - point.x) + Math.abs(tile.y - point.y);
+        this.tweens.add({
+            targets: [tile],
+            x: point.x,
+            y: point.y,
+            duration: gameOptions.tweenSpeed * distance / gameOptions.tileSize,
+            callbackScope: this,
+            onComplete: function() {
+                if (upgrade) {
+                    this.upgradeTile(tile);
+                } else {
+                    this.endTween(tile);
+                }
+            }
+        });
+    }
+
+    upgradeTile(tile) {
+        tile.setFrame(tile.frame.name + 1);
+        this.tweens.add({
+            targets: [tile],
+            scaleX: 1.1,
+            scaleY: 1.1,
+            duration: gameOptions.tweenSpeed,
+            yoyo: true,
+            repeat: 1,
+            callbackScope: this,
+            onComplete: function() {
+                this.endTween(tile);
+            }
+        });
+    }
+
+    endTween(tile) {
+        this.movingTiles--;
+        tile.depth = 0;
+        if (this.movingTiles == 0) {
+            this.refreshBoard();
+        }
     }
 
     refreshBoard() {
@@ -225,6 +273,7 @@ class playGame extends Phaser.Scene {
                 if (tileValue > 0) {
                     this.boardArray[i][j].tileSprite.visible = true;
                     this.boardArray[i][j].tileSprite.setFrame(tileValue - 1);
+                    this.boardArray[i][j].upgraded = false;
                 } else {
                     this.boardArray[i][j].tileSprite.visible = false;
                 }
