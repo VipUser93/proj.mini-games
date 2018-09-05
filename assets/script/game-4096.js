@@ -6,10 +6,12 @@ var gameOptions = {
         rows: 4,
         cols: 4
     },
-    tweenSpeed: 200,
+    tweenSpeed: 50,
     swipeMaxTime: 1000,
     swipeMinDistance: 20,
-    swipeMinNormal: 0.85
+    swipeMinNormal: 0.85,
+    aspectRatio: 16/9,
+    localStorageName: "topscore4096"
 };
 const LEFT = 0;
 const RIGHT = 1;
@@ -17,12 +19,15 @@ const UP = 2;
 const DOWN = 3;
 
 window.onload = function() {
+    let tileAndSpacing = gameOptions.tileSize + gameOptions.tileSpacing;
+    let width = gameOptions.boardSize.cols * tileAndSpacing;
+    width += gameOptions.tileSpacing;
     var gameConfig = {
         type: Phaser.AUTO,
         title: '4096',
         parent: 'game-wrapper',
-        width: gameOptions.boardSize.cols * (gameOptions.tileSize + gameOptions.tileSpacing) + gameOptions.tileSpacing,
-        height: gameOptions.boardSize.rows * (gameOptions.tileSize + gameOptions.tileSpacing) + gameOptions.tileSpacing,
+        width: width,
+        height: width * gameOptions.aspectRatio,
         backgroundColor: 0xecf0f1,
         scene: [loadGame, playGame]
     }
@@ -39,11 +44,20 @@ class loadGame extends Phaser.Scene {
     }
 
     preload() {
+        this.load.image("restart", "../assets/sprites/restart.png");
+        this.load.image("scorepanel", "../assets/sprites/scorepanel.png");
+        this.load.image("scorelabels", "../assets/sprites/scorelabels.png");
+        this.load.image("logo", "../assets/sprites/logo.png");
+        this.load.image("howtoplay", "../assets/sprites/howtoplay.png");
+        this.load.image("gametitle", "../assets/sprites/gametitle.png");
         this.load.image("emptytyle", "../assets/sprites/emptytile.png");
         this.load.spritesheet("tiles", "../assets/sprites/tiles.png", {
             frameWidth: gameOptions.tileSize,
             frameHeight: gameOptions.tileSize
         });
+        this.load.audio("move", ["../assets/sounds/move.ogg", "../assets/sounds/move.mp3"]);
+        this.load.audio("grow", ["../assets/sounds/grow.ogg", "../assets/sounds/grow.mp3"]);
+        this.load.bitmapFont("font", "../assets/fonts/font.png", "../assets/fonts/font.fnt");
     }
 
     create() {
@@ -57,6 +71,34 @@ class playGame extends Phaser.Scene {
     }
 
     create() {
+        this.score = 0;
+        let restartXY = this.getTilePosition(-0.8, gameOptions.boardSize.cols - 1);
+        let restartButton = this.add.sprite(restartXY.x, restartXY.y, "restart");
+        restartButton.setInteractive();
+        restartButton.on("pointerdown", function() {
+            this.scene.start("PlayGame");
+        }, this);
+        let scoreXY = this.getTilePosition(-0.8, 1);
+        this.add.image(scoreXY.x, scoreXY.y, "scorepanel");
+        this.add.image(scoreXY.x, scoreXY.y - 70, "scorelabels");
+        let textXY = this.getTilePosition(-0.92, -0.4);
+        this.scoreText = this.add.bitmapText(textXY.x, textXY.y, "font", "0");
+        textXY = this.getTilePosition(-0.92, 1.1);
+        this.bestScore = localStorage.getItem(gameOptions.localStorageName);
+        if (this.bestScore == null) {
+            this.bestScore = 0;
+        }
+        this.bestScoreText = this.add.bitmapText(textXY.x, textXY.y, "font", this.bestScore.toString());
+        let gameTitle = this.add.image(10, 5, "gametitle");
+        gameTitle.setOrigin(0, 0);
+        let howTo = this.add.image(game.config.width, 5, "howtoplay");
+        howTo.setOrigin(1, 0);
+        let logo = this.add.sprite(game.config.width / 2, game.config.height, "logo");
+        logo.setOrigin(0.5, 1);
+        logo.setInteractive();
+        logo.on("pointerdown", function() {
+            window.location.href = "http://www.emanueleferonato.com/";
+        });
         this.canMove = false;
         this.boardArray = [];
         for (let i = 0; i < gameOptions.boardSize.rows; i++) {
@@ -64,7 +106,7 @@ class playGame extends Phaser.Scene {
             for (let j = 0; j < gameOptions.boardSize.cols; j++) {
                 let tilePosition = this.getTilePosition(i, j);
                 this.add.image(tilePosition.x, tilePosition.y, "emptytyle");
-                var tile = this.add.sprite(tilePosition.x, tilePosition.y, "tiles", 0);
+                let tile = this.add.sprite(tilePosition.x, tilePosition.y, "tiles", 0);
                 tile.visible = false;
                 this.boardArray[i][j] = {
                     tileValue: 0,
@@ -77,11 +119,17 @@ class playGame extends Phaser.Scene {
         this.addTile();
         this.input.keyboard.on("keydown", this.handleKey, this);
         this.input.on("pointerup", this.handleSwipe, this);
+        this.moveSound = this.sound.add("move");
+        this.growSound = this.sound.add("grow");
     }
 
     getTilePosition(row, col) {
         let posX = gameOptions.tileSpacing * (col + 1) + gameOptions.tileSize * (col + 0.5);
         let posY = gameOptions.tileSpacing * (row + 1) + gameOptions.tileSize * (row + 0.5);
+        let boardHeight = gameOptions.boardSize.rows * gameOptions.tileSize;
+        boardHeight += (gameOptions.boardSize.rows + 1) * gameOptions.tileSpacing;
+        let offsetY = (game.config.height - boardHeight) / 2;
+        posY += offsetY;
         return new Phaser.Geom.Point(posX, posY);
     }
 
@@ -91,8 +139,11 @@ class playGame extends Phaser.Scene {
         if (!rowInside || !colInside) {
             return false;
         }
-        let emptySpot = this.boardArray[row][col].tileValue = 0;
-        let sameValue = this.boardArray[row][col].tileValue = value;
+        if (this.boardArray[row][col].tileValue == 12) {
+            return false;
+        }
+        let emptySpot = this.boardArray[row][col].tileValue == 0;
+        let sameValue = this.boardArray[row][col].tileValue == value;
         var alreadyUpgraded = this.boardArray[row][col].upgraded;
         return emptySpot || (sameValue && !alreadyUpgraded);
     }
@@ -172,16 +223,13 @@ class playGame extends Phaser.Scene {
                     this.makeMove(UP);
                 }
             }
-            console.log("Movement time:" + swipeTime + " ms");
-            console.log("Horizontal distance: " + swipe.x + " pixels");
-            console.log("Vertical distance: " + swipe.y + " pixels");
         }
     }
 
     makeMove(d) {
         this.movingTiles = 0;
         let dRow = (d == LEFT || d == RIGHT) ? 0 : d == UP ? -1 : 1;
-        let dCol = (d == UP || d == DOWN) ? 0 : d == LEFT ? - 1 : 1;
+        let dCol = (d == UP || d == DOWN) ? 0 : d == LEFT ? -1 : 1;
         this.canMove = false;
         let firstRow = (d == UP) ? 1 : 0;
         let lastRow = gameOptions.boardSize.rows - ((d == DOWN) ? 1 : 0);
@@ -206,6 +254,7 @@ class playGame extends Phaser.Scene {
                         this.boardArray[curRow][curCol].tileValue = 0;
                         if (willUpdate) {
                             this.boardArray[newRow][newCol].tileValue++;
+                            this.score += Math.pow(2, this.boardArray[newRow][newCol].tileValue);
                             this.boardArray[newRow][newCol].upgraded = true;
                         } else {
                             this.boardArray[newRow][newCol].tileValue = tileValue;
@@ -216,6 +265,8 @@ class playGame extends Phaser.Scene {
         }
         if (this.movingTiles == 0) {
             this.canMove = true;
+        } else {
+            this.moveSound.play();
         }
     }
 
@@ -240,6 +291,7 @@ class playGame extends Phaser.Scene {
     }
 
     upgradeTile(tile) {
+        this.growSound.play();
         tile.setFrame(tile.frame.name + 1);
         this.tweens.add({
             targets: [tile],
@@ -264,6 +316,12 @@ class playGame extends Phaser.Scene {
     }
 
     refreshBoard() {
+        this.scoreText.text = this.score.toString();
+        if (this.score > this.bestScore) {
+            this.bestScore = this.score;
+            localStorage.setItem(gameOptions.localStorageName, this.bestScore);
+            this.bestScoreText.text = this.bestScore.toString();
+        }
         for (let i = 0; i < gameOptions.boardSize.rows; i++) {
             for (let j = 0; j < gameOptions.boardSize.cols; j++) {
                 let spritePosition = this.getTilePosition(i, j);
