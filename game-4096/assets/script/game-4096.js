@@ -44,20 +44,20 @@ class loadGame extends Phaser.Scene {
     }
 
     preload() {
-        this.load.image("restart", "../assets/sprites/restart.png");
-        this.load.image("scorepanel", "../assets/sprites/scorepanel.png");
-        this.load.image("scorelabels", "../assets/sprites/scorelabels.png");
-        this.load.image("logo", "../assets/sprites/logo.png");
-        this.load.image("howtoplay", "../assets/sprites/howtoplay.png");
-        this.load.image("gametitle", "../assets/sprites/gametitle.png");
-        this.load.image("emptytyle", "../assets/sprites/emptytile.png");
-        this.load.spritesheet("tiles", "../assets/sprites/tiles.png", {
+        this.load.image("restart", "../game-4096/assets/sprites/restart.png");
+        this.load.image("scorepanel", "../game-4096/assets/sprites/scorepanel.png");
+        this.load.image("scorelabels", "../game-4096/assets/sprites/scorelabels.png");
+        this.load.image("logo", "../game-4096/assets/sprites/logo.png");
+        this.load.image("howtoplay", "../game-4096/assets/sprites/howtoplay.png");
+        this.load.image("gametitle", "../game-4096/assets/sprites/gametitle.png");
+        this.load.image("emptytyle", "../game-4096/assets/sprites/emptytile.png");
+        this.load.spritesheet("tiles", "../game-4096/assets/sprites/tiles.png", {
             frameWidth: gameOptions.tileSize,
             frameHeight: gameOptions.tileSize
         });
-        this.load.audio("move", ["../assets/sounds/move.ogg", "../assets/sounds/move.mp3"]);
-        this.load.audio("grow", ["../assets/sounds/grow.ogg", "../assets/sounds/grow.mp3"]);
-        this.load.bitmapFont("font", "../assets/fonts/font.png", "../assets/fonts/font.fnt");
+        this.load.audio("move", ["../game-4096/assets/sounds/move.ogg", "../game-4096/assets/sounds/move.mp3"]);
+        this.load.audio("grow", ["../game-4096/assets/sounds/grow.ogg", "../game-4096/assets/sounds/grow.mp3"]);
+        this.load.bitmapFont("font", "../game-4096/assets/fonts/font.png", "../game-4096/assets/fonts/font.fnt");
     }
 
     create() {
